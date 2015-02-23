@@ -1,36 +1,131 @@
+require 'byebug'
+require 'io/console'
+require 'yaml'
+
 class Minesweeper
+  def initialize
+    @board = Board.new
+  end
+
+  def inspect
+  end
+
   def run
-    # until won? || lost?
-    #   display
-    #   move
-    #     if move == flagged then flag
-    #     if move == revealed then reveal
-    #   end
-    # end
+    until @board.won? || @board.lost?
+      system('clear')
+      display
+      move
+    end
+    display
+    message(@board.won?)
+    replay
+  end
+
+  def save_game
+    File.open("minesweeper_save.yml", 'w') do |f|
+      f.puts @board.to_yaml
+    end
+  end
+
+  def load_game
+    @board = YAML::load(File.open("minesweeper_save.yml"))
+  end
+
+  def replay
+    puts 'Play again (y/N)?'
+    input = gets.chomp
+    if input == 'y'
+      @board = Board.new
+      run
+    else
+      puts "Goodbye"
+    end
+  end
+
+  def message(won)
+    puts won ? "You win!" : "You lose!"
+  end
+
+  def display
+    @board.display
+  end
+
+  def move
+    puts "Use the arrow keys to select a coordinate. Hit r to reveal, f to flag"
+    puts "Enter 's' to save or 'l' to load"
+    input = read_char
+    case input
+    when "\e[A" #up
+      @board.cursor_move(:up)
+    when "\e[B" #down
+      @board.cursor_move(:down)
+    when "\e[C" #right
+      @board.cursor_move(:right)
+    when "\e[D" #left
+      @board.cursor_move(:left)
+    when 'f'
+      @board.flag
+    when 'r'
+      @board.reveal
+    when 's'
+      save_game
+      exit 0
+    when 'q'
+      exit 0
+    when 'l'
+      load_game
+    when "\u0003"
+      exit 0
+    else
+      puts 'invalid action'
+    end
+  end
+
+  def read_char
+    begin
+      STDIN.echo = false
+      STDIN.raw!
+
+      input = STDIN.getc.chr
+      if input == "\e"
+        input << STDIN.read_nonblock(3) rescue nil
+        input << STDIN.read_nonblock(2) rescue nil
+      end
+    ensure
+      STDIN.echo = true
+      STDIN.cooked!
+
+      return input
+    end
   end
 end
 
 class Board
   def initialize(size = 9)
     @size = size
-    non_bombs = (@size ** 2) - num_bombs
+    @cursor = [0, 0]
+    non_bombs = (@size**2) - num_bombs
     marks = ([:bomb] * num_bombs + [:no_bomb] * non_bombs).shuffle
     @tiles = Array.new(@size) { Array.new(@size) { Tile.new(marks.pop) } }
     compute_neighbors
   end
 
   def compute_neighbors
-    move_indices = [-1,0,1].permutation(2).to_a - [0,0] + [1,1] + [-1,-1]
+    move_indices = [-1,0,1].permutation(2).to_a - [[0,0]] + [[1,1], [-1,-1]]
     @tiles.each_with_index do |row, row_index|
       row.each_with_index do |tile, col_index|
         move_indices.each do |move|
           potential_move = [row_index + move[0], col_index + move[1]]
-          tile.neighbors << potential_move if valid?(potential_move)
-          # tile.compute_bombs
+          tile.neighbors << self[potential_move] if valid?(potential_move)
+          tile.compute_bombs
         end
       end
     end
     nil
+  end
+
+  def [](pos)
+    return @tiles[pos[0]][pos[1]]
   end
 
   def valid?(move)
@@ -38,12 +133,70 @@ class Board
   end
 
   def num_bombs
-    @size * 2
+    @size
+  end
+
+  def flag
+    self[@cursor].flagged
+  end
+
+  def lost?
+    @tiles.any? do |row|
+      row.any? do |tile|
+        tile.mark == :bomb && tile.revealed == true
+      end
+    end
+  end
+
+  def won?
+    @tiles.all? do |row|
+      row.all? do |tile|
+        (!tile.is_bomb? && tile.revealed) || tile.is_bomb?
+      end
+    end
+  end
+
+  def reveal
+    self[@cursor].reveal
+  end
+
+  def display
+    @tiles.each_with_index do |row, row_i|
+      row.each_with_index do |tile, col_i|
+        if !is_cursor?([row_i, col_i])
+          print tile.display + ' '
+        elsif won? || lost?
+          print tile.display + ' '
+        else
+          print 178.chr + ' '
+        end
+      end
+      print "\n"
+    end
+  end
+
+  def is_cursor?(pos)
+    @cursor == pos
+  end
+
+  def cursor_move(direction)
+    case direction
+    when :right
+      @cursor[1] += 1 unless @cursor[1] == @size - 1
+    when :left
+      @cursor[1] -= 1 unless @cursor[1] < 1
+    when :up
+      @cursor[0] -= 1 unless @cursor[0] < 1
+    when :down
+      @cursor[0] += 1 unless @cursor[0] == @size - 1
+    else
+    end
   end
 end
 
 class Tile
   attr_accessor :neighbors
+  attr_reader :mark, :revealed
 
   def initialize(mark)
     @mark = mark
@@ -53,10 +206,41 @@ class Tile
   end
 
   def reveal
-
+    unless @flagged
+      @revealed = true
+      if @num_bombs == 0
+        @neighbors.each do |neighbor|
+          neighbor.reveal unless neighbor.revealed
+        end
+      end
+    end
   end
 
-  def is_bombed?
+  def flagged
+    @flagged = !@flagged
+  end
+
+  def compute_bombs
+    @num_bombs = neighbors.count do |neighbor|
+      neighbor.is_bomb?
+    end
+  end
+
+  def is_bomb?
     @mark == :bomb
+  end
+
+  def display
+    case @revealed
+    when true
+      case is_bomb?
+      when true
+        '!'
+      else
+        @num_bombs == 0 ? "_" : "#{@num_bombs}"
+      end
+    else
+      @flagged ? 'F' : '#'
+    end
   end
 end
