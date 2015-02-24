@@ -1,6 +1,7 @@
 require 'byebug'
 require 'io/console'
 require 'yaml'
+require 'colorize'
 
 class Minesweeper
   def initialize
@@ -168,7 +169,7 @@ class Board
         elsif won? || lost?
           print tile.display + ' '
         else
-          print 178.chr + ' '
+          print " ".colorize(background: :white) + ' '
         end
       end
       print "\n"
@@ -230,17 +231,22 @@ class Tile
     @mark == :bomb
   end
 
+  def number_colors
+    [:light_blue, :green, :light_red, :light_magenta, :cyan, :blue, :light_cyan,
+      :magenta][@num_bombs - 1]
+  end
+
   def display
     case @revealed
     when true
       case is_bomb?
       when true
-        '!'
+        'B'.colorize(:red)
       else
-        @num_bombs == 0 ? "_" : "#{@num_bombs}"
+        @num_bombs == 0 ? "*".colorize(:white) : "#{@num_bombs}".colorize(number_colors)
       end
     else
-      @flagged ? 'F' : '#'
+      @flagged ? 'F'.colorize(:red) : '#'.colorize(:yellow)
     end
   end
 end
