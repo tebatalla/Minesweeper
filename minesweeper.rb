@@ -146,6 +146,29 @@ class Board
       row.any? do |tile|
         tile.mark == :bomb && tile.revealed == true
       end
+    end.tap do |lost|
+      if lost
+        @tiles.each do |rows|
+          rows.each do |tile|
+            finalize(tile)
+          end
+        end
+      end
+    end
+  end
+
+  def finalize(tile)
+    if tile.is_bomb?
+      if tile.revealed
+        tile.killing_bomb
+      else
+        debugger
+        tile.reveal
+      end
+    else
+      if tile.is_flagged?
+        tile.bad_flag
+      end
     end
   end
 
@@ -204,21 +227,31 @@ class Tile
     @neighbors = []
     @flagged = false
     @revealed = false
+    @bad_flag = false
+    @killing_bomb = false
   end
 
   def reveal
-    unless @flagged
+    if !@flagged && !@revealed
       @revealed = true
       if @num_bombs == 0
         @neighbors.each do |neighbor|
-          neighbor.reveal unless neighbor.revealed
+          neighbor.reveal unless neighbor.revealed || is_bomb?
         end
+      end
+    elsif @revealed
+      if neighbors.count { |neighbor| neighbor.is_flagged? } == @num_bombs
+        neighbors.each { |neighbor| neighbor.reveal unless neighbor.revealed }
       end
     end
   end
 
   def flagged
     @flagged = !@flagged
+  end
+
+  def is_flagged?
+    @flagged
   end
 
   def compute_bombs
@@ -228,7 +261,7 @@ class Tile
   end
 
   def is_bomb?
-    @mark == :bomb
+    (@mark == :bomb) || (@mark == :kill)
   end
 
   def number_colors
@@ -236,17 +269,44 @@ class Tile
       :magenta][@num_bombs - 1]
   end
 
+  def killing_bomb
+    @mark = :kill
+  end
+
+  def bad_flag
+    @mark = :bad_flag
+  end
+
   def display
     case @revealed
     when true
       case is_bomb?
       when true
-        'B'.colorize(:red)
+        if @mark == :kill
+          'X'.colorize(color: :red, background: :white)
+        else
+          'B'.colorize(:red)
+        end
       else
         @num_bombs == 0 ? "*".colorize(:white) : "#{@num_bombs}".colorize(number_colors)
       end
     else
-      @flagged ? 'F'.colorize(:red) : '#'.colorize(:yellow)
+      if @flagged && @mark != :bad_flag
+        'F'.colorize(:red)
+      elsif mark == :bad_flag
+        'B'.colorize(color: :red, background: :white)
+      else
+        '#'.colorize(:yellow)
+      end
     end
   end
 end
+
+
+# if __FILE__ == $PROGRAM_NAME
+#   game = Minesweeper.new
+#   input = ""
+#   while input != 'q'
+#
+#   end
+# end
