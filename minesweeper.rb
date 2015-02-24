@@ -17,6 +17,7 @@ class Minesweeper
       display
       move
     end
+    @board.reveal_bombs if @board.lost?
     display
     message(@board.won?)
     replay
@@ -146,13 +147,13 @@ class Board
       row.any? do |tile|
         tile.mark == :bomb && tile.revealed == true
       end
-    end.tap do |lost|
-      if lost
-        @tiles.each do |rows|
-          rows.each do |tile|
-            finalize(tile)
-          end
-        end
+    end
+  end
+
+  def reveal_bombs
+    @tiles.each do |rows|
+      rows.each do |tile|
+        finalize(tile)
       end
     end
   end
@@ -162,7 +163,6 @@ class Board
       if tile.revealed
         tile.killing_bomb
       else
-        debugger
         tile.reveal
       end
     else
@@ -220,7 +220,7 @@ end
 
 class Tile
   attr_accessor :neighbors
-  attr_reader :mark, :revealed
+  attr_reader :mark, :revealed, :bad_flag, :killing_bomb
 
   def initialize(mark)
     @mark = mark
@@ -236,7 +236,7 @@ class Tile
       @revealed = true
       if @num_bombs == 0
         @neighbors.each do |neighbor|
-          neighbor.reveal unless neighbor.revealed || is_bomb?
+          neighbor.reveal unless (neighbor.revealed || is_bomb?)
         end
       end
     elsif @revealed
@@ -261,7 +261,7 @@ class Tile
   end
 
   def is_bomb?
-    (@mark == :bomb) || (@mark == :kill)
+    (@mark == :bomb)
   end
 
   def number_colors
@@ -270,11 +270,11 @@ class Tile
   end
 
   def killing_bomb
-    @mark = :kill
+    @killing_bomb = true
   end
 
   def bad_flag
-    @mark = :bad_flag
+    @bad_flag = true
   end
 
   def display
@@ -282,7 +282,7 @@ class Tile
     when true
       case is_bomb?
       when true
-        if @mark == :kill
+        if @killing_bomb
           'X'.colorize(color: :red, background: :white)
         else
           'B'.colorize(:red)
@@ -291,9 +291,9 @@ class Tile
         @num_bombs == 0 ? "*".colorize(:white) : "#{@num_bombs}".colorize(number_colors)
       end
     else
-      if @flagged && @mark != :bad_flag
+      if @flagged && !@bad_flag
         'F'.colorize(:red)
-      elsif mark == :bad_flag
+      elsif @bad_flag
         'B'.colorize(color: :red, background: :white)
       else
         '#'.colorize(:yellow)
