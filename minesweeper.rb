@@ -1,4 +1,3 @@
-require 'byebug'
 require 'io/console'
 require 'yaml'
 require 'colorize'
@@ -303,10 +302,10 @@ class Tile
 end
 
 
-# if __FILE__ == $PROGRAM_NAME
-#   game = Minesweeper.new
-#   input = ""
-#   while input != 'q'
-#
-#   end
-# end
+if __FILE__ == $PROGRAM_NAME
+  game = Minesweeper.new.run
+  input = ""
+  while input != 'q'
+
+  end
+end
