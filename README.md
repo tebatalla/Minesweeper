@@ -1,5 +1,6 @@
 # Ruby Minesweeper
 ![minesweeper]
+
 Command line Minesweeper. To start, clone the repo, `bundle` and run
 ```
 $ ruby minesweeper.rb
